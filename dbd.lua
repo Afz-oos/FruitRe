@@ -645,18 +645,18 @@ end
 
 local function checkAndRunAutoFarm()
     if not getgenv().Config.AutoFarm then return end
-    if getgenv().Config.AutoRace then return end 
+    if getgenv().Config.AutoRace then return end
 
     local car = getCar()
     if not car then return end
-    
+
     local driveSeat = car:FindFirstChild("DriveSeat")
     if not driveSeat then return end
 
     local carPart = car.PrimaryPart or driveSeat
 
     local skyY = 5000
-    
+
     if carPart.Position.Y < skyY - 100 then
         car:PivotTo(CFrame.new(carPart.Position.X, skyY, carPart.Position.Z))
         print("[AutoFarm] Levitation Activated! Flying at Y=5000")
@@ -682,17 +682,165 @@ local function checkAndRunAutoFarm()
 
     local speed = getgenv().Config.FarmSpeed or 500
     local targetVel = Vector3.new(speed * getgenv().AutoFarmState.Direction, 0, 0)
-    
+
     driveSeat.AssemblyAngularVelocity = Vector3.zero
     driveSeat.AssemblyLinearVelocity = targetVel
 end
 
+-- ======================================
+-- 🔥 HARDCORE ANTI-AFK SYSTEM 🔥
+-- ======================================
+
+getgenv().AntiAFKState = getgenv().AntiAFKState or {
+    LastJump = 0,
+    LastMove = 0,
+    LastCamera = 0,
+    LastInput = 0,
+    Enabled = true
+}
+
+local function RandomFloat(min, max)
+    return min + (math.random() * (max - min))
+end
+
+local function RandomInt(min, max)
+    return math.random(min, max)
+end
+
+-- กระโดดสุ่ม
+local function AntiAFK_Jump()
+    local character = LocalPlayer.Character
+    if not character then return end
+
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid and humanoid.Health > 0 then
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end
+
+-- ขยับตัวละครสุ่ม
+local function AntiAFK_RandomMovement()
+    local character = LocalPlayer.Character
+    if not character then return end
+
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+
+    if humanoid and rootPart and humanoid.Health > 0 then
+        local randomDir = Vector3.new(
+            RandomFloat(-1, 1),
+            0,
+            RandomFloat(-1, 1)
+        ).Unit
+
+        humanoid:Move(randomDir, true)
+
+        task.delay(RandomFloat(0.1, 0.3), function()
+            if humanoid then
+                humanoid:Move(Vector3.zero, true)
+            end
+        end)
+    end
+end
+
+-- ส่ายกล้องสุ่ม
+local function AntiAFK_CameraShake()
+    local camera = workspace.CurrentCamera
+    if not camera then return end
+
+    local currentCFrame = camera.CFrame
+    local randomAngle = CFrame.Angles(
+        math.rad(RandomFloat(-5, 5)),
+        math.rad(RandomFloat(-5, 5)),
+        0
+    )
+
+    camera.CFrame = currentCFrame * randomAngle
+end
+
+-- ส่ง Virtual Input สุ่ม (หลอกระบบ AFK)
+local function AntiAFK_VirtualInput()
+    local vim = game:GetService("VirtualInputManager")
+
+    local keys = {
+        Enum.KeyCode.W,
+        Enum.KeyCode.A,
+        Enum.KeyCode.S,
+        Enum.KeyCode.D,
+        Enum.KeyCode.Space
+    }
+
+    local randomKey = keys[RandomInt(1, #keys)]
+
+    vim:SendKeyEvent(true, randomKey, false, game)
+    task.wait(RandomFloat(0.05, 0.15))
+    vim:SendKeyEvent(false, randomKey, false, game)
+end
+
+-- ขยับเมาส์สุ่ม
+local function AntiAFK_MouseMovement()
+    local vim = game:GetService("VirtualInputManager")
+
+    local randomX = RandomInt(100, 1000)
+    local randomY = RandomInt(100, 800)
+
+    vim:SendMouseMoveEvent(randomX, randomY, game)
+end
+
+-- หมุนตัวละครสุ่ม
+local function AntiAFK_RandomRotation()
+    local character = LocalPlayer.Character
+    if not character then return end
+
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if rootPart then
+        local randomAngle = math.rad(RandomFloat(-180, 180))
+        rootPart.CFrame = rootPart.CFrame * CFrame.Angles(0, randomAngle, 0)
+    end
+end
+
+-- ระบบ Anti-AFK หลัก (ไม่กระโดด เพราะจะทำให้รถเบรค!)
+local function RunAntiAFK()
+    if not getgenv().AntiAFKState.Enabled then return end
+
+    local currentTime = tick()
+
+    -- ❌ ปิดการกระโดด - จะทำให้รถเบรค!
+
+    -- ขยับตัวละครทุก 5-12 วินาที
+    if currentTime - getgenv().AntiAFKState.LastMove > RandomFloat(5, 12) then
+        pcall(AntiAFK_RandomMovement)
+        getgenv().AntiAFKState.LastMove = currentTime
+        print("[Anti-AFK] 🏃 Moved randomly!")
+    end
+
+    -- ส่ายกล้องทุก 3-8 วินาที
+    if currentTime - getgenv().AntiAFKState.LastCamera > RandomFloat(3, 8) then
+        pcall(AntiAFK_CameraShake)
+        getgenv().AntiAFKState.LastCamera = currentTime
+    end
+
+    -- ส่ง Input สุ่มทุก 4-10 วินาที
+    if currentTime - getgenv().AntiAFKState.LastInput > RandomFloat(4, 10) then
+        pcall(AntiAFK_VirtualInput)
+        pcall(AntiAFK_MouseMovement)
+        getgenv().AntiAFKState.LastInput = currentTime
+        print("[Anti-AFK] ⌨️ Sent virtual input!")
+    end
+
+    -- หมุนตัวละครสุ่มทุก 20-30 วินาที
+    if math.random(1, 100) < 5 then
+        pcall(AntiAFK_RandomRotation)
+        print("[Anti-AFK] 🔄 Rotated randomly!")
+    end
+end
+
 task.spawn(function()
-    while task.wait(0.1) do 
+    while task.wait(0.1) do
         pcall(checkAndClickPlay)
         pcall(checkAndSelectStarterCar)
         pcall(checkAndSpawnCar)
-        
+
         if getgenv().Config.AutoFarm then
             pcall(checkAndRunAutoFarm)
         elseif getgenv().Config.AutoRace then
@@ -703,4 +851,13 @@ task.spawn(function()
     end
 end)
 
+-- เปิดระบบ Anti-AFK แบบอิสระ
+task.spawn(function()
+    print("[Anti-AFK] 🔥 Hardcore Anti-AFK System Activated!")
+    while task.wait(RandomFloat(2, 5)) do
+        pcall(RunAntiAFK)
+    end
+end)
+
 print("Midnight Chasers Script Loaded! (No UI, Auto Everything)")
+print("[Anti-AFK] 🛡️ Anti-AFK Protection: ACTIVE")
